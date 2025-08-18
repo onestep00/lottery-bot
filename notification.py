@@ -12,7 +12,7 @@ class Notification:
             return
 
         lotto_number_str = self.make_lotto_number_message(result["arrGameChoiceNum"])
-        message = f"{result['buyRound']}회 로또 구매 완료 :moneybag: 남은잔액 : {body['balance']}\n```{lotto_number_str}```"
+        message = f"{result['buyRound']}회 로또 구매 완료\n남은잔액 : {body['balance']}\n```{lotto_number_str}```"
         self._send_telegram_webhook(webhook_url, message)
 
     def make_lotto_number_message(self, lotto_number: list) -> str:
@@ -37,7 +37,7 @@ class Notification:
         win720_round = body.get("resultMsg").split("|")[3]
 
         win720_number_str = self.make_win720_number_message(body.get("saleTicket"))
-        message = f"{win720_round}회 연금복권 구매 완료 :moneybag: 남은잔액 : {body['balance']}\n```\n{win720_number_str}```"
+        message = f"{win720_round}회 연금복권 구매 완료\n남은잔액 : {body['balance']}\n```\n{win720_number_str}```"
         self._send_telegram_webhook(webhook_url, message)
 
     def make_win720_number_message(self, win720_number: str) -> str:
