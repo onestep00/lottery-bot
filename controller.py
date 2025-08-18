@@ -1,12 +1,13 @@
 import os
 import sys
+import time
+
 from dotenv import load_dotenv
 
 import auth
 import lotto645
-import win720
 import notification
-import time
+import win720
 
 
 def buy_lotto645(authCtrl: auth.AuthController, cnt: int, mode: str):
@@ -40,7 +41,7 @@ def send_message(mode: int, lottery_type: int, response: dict, webhook_url: str)
             notify.send_lotto_winning_message(response, webhook_url)
         else:
             notify.send_win720_winning_message(response, webhook_url)
-    elif mode == 1: 
+    elif mode == 1:
         if lottery_type == 0:
             notify.send_lotto_buying_message(response, webhook_url)
         else:
@@ -51,41 +52,37 @@ def check():
 
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
-    slack_webhook_url = os.environ.get('SLACK_WEBHOOK_URL') 
-    discord_webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
+    telegram_webhook_url = os.environ.get('TELEGRAM_WEBHOOK_URL')
 
     globalAuthCtrl = auth.AuthController()
     globalAuthCtrl.login(username, password)
-    
+
     response = check_winning_lotto645(globalAuthCtrl)
-    send_message(0, 0, response=response, webhook_url=discord_webhook_url)
+    send_message(0, 0, response=response, webhook_url=telegram_webhook_url)
 
-    time.sleep(10)
-    
     response = check_winning_win720(globalAuthCtrl)
-    send_message(0, 1, response=response, webhook_url=discord_webhook_url)
+    send_message(0, 1, response=response, webhook_url=telegram_webhook_url)
 
-def buy(): 
-    
-    load_dotenv() 
+def buy():
+
+    load_dotenv()
 
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
     count = int(os.environ.get('COUNT'))
-    slack_webhook_url = os.environ.get('SLACK_WEBHOOK_URL') 
-    discord_webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
+    telegram_webhook_url = os.environ.get('TELEGRAM_WEBHOOK_URL')
     mode = "AUTO"
 
     globalAuthCtrl = auth.AuthController()
     globalAuthCtrl.login(username, password)
 
-    response = buy_lotto645(globalAuthCtrl, count, mode) 
-    send_message(1, 0, response=response, webhook_url=discord_webhook_url)
+    response = buy_lotto645(globalAuthCtrl, count, mode)
+    send_message(1, 0, response=response, webhook_url=telegram_webhook_url)
 
-    time.sleep(10)
+    time.sleep(1)
 
-    response = buy_win720(globalAuthCtrl, username) 
-    send_message(1, 1, response=response, webhook_url=discord_webhook_url)
+    response = buy_win720(globalAuthCtrl, username)
+    send_message(1, 1, response=response, webhook_url=telegram_webhook_url)
 
 def run():
     if len(sys.argv) < 2:
@@ -96,7 +93,7 @@ def run():
         buy()
     elif sys.argv[1] == "check":
         check()
-  
+
 
 if __name__ == "__main__":
     run()

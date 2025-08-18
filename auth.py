@@ -1,6 +1,9 @@
 import copy
+
 import requests
+
 from HttpClient import HttpClientSingleton
+
 
 class AuthController:
     _REQ_HEADERS = {
@@ -28,8 +31,8 @@ class AuthController:
         self.http_client = HttpClientSingleton.get_instance()
 
     def login(self, user_id: str, password: str):
-        assert type(user_id) == str
-        assert type(password) == str
+        assert isinstance(user_id, str)
+        assert isinstance(password, str)
 
         default_auth_cred = (
             self._get_default_auth_cred()
@@ -44,7 +47,7 @@ class AuthController:
         self._update_auth_cred(default_auth_cred)
 
     def add_auth_cred_to_headers(self, headers: dict) -> str:
-        assert type(headers) == dict
+        assert isinstance(headers, dict)
 
         copied_headers = copy.deepcopy(headers)
         copied_headers["Cookie"] = f"JSESSIONID={self._AUTH_CRED}"
@@ -58,7 +61,7 @@ class AuthController:
         return self._get_j_session_id_from_response(res)
 
     def _get_j_session_id_from_response(self, res: requests.Response):
-        assert type(res) == requests.Response
+        assert isinstance(res, requests.Response)
 
         for cookie in res.cookies:
             if cookie.name == "JSESSIONID":
@@ -67,15 +70,15 @@ class AuthController:
         raise KeyError("JSESSIONID cookie is not set in response")
 
     def _generate_req_headers(self, j_session_id: str):
-        assert type(j_session_id) == str
+        assert isinstance(j_session_id, str)
 
         copied_headers = copy.deepcopy(self._REQ_HEADERS)
         copied_headers["Cookie"] = f"JSESSIONID={j_session_id}"
         return copied_headers
 
     def _generate_body(self, user_id: str, password: str):
-        assert type(user_id) == str
-        assert type(password) == str
+        assert isinstance(user_id, str)
+        assert isinstance(password, str)
 
         return {
             "returnUrl": "https://dhlottery.co.kr/common.do?method=main",
@@ -86,8 +89,8 @@ class AuthController:
         }
 
     def _try_login(self, headers: dict, data: dict):
-        assert type(headers) == dict
-        assert type(data) == dict
+        assert isinstance(headers, dict)
+        assert isinstance(data, dict)
 
         res = self.http_client.post(
             "https://www.dhlottery.co.kr/userSsl.do?method=login",
@@ -97,7 +100,7 @@ class AuthController:
         return res
 
     def _update_auth_cred(self, j_session_id: str) -> None:
-        assert type(j_session_id) == str
+        assert isinstance(j_session_id, str)
 
         # TODO: judge whether login is success or not
         # 로그인 실패해도 jsession 값이 갱신되기 때문에, 마이페이지 방문 등으로 판단해야 할 듯

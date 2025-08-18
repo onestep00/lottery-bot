@@ -8,13 +8,12 @@ jobs:
   build:
     runs-on: [ubuntu-latest]
     name: Check Winning
-    steps:  
-
-      - uses: actions/checkout@v3    
+    steps:
+      - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
-          cache: 'pip' # caching pip dependencies
+          python-version: "3.9"
+          cache: "pip" # caching pip dependencies
       - run: pip install -r requirements.txt
 
       - name: Run Scripts
@@ -22,6 +21,4 @@ jobs:
         env:
           USERNAME: ${{ secrets.USERNAME }}
           PASSWORD: ${{ secrets.PASSWORD }}
-          COUNT: ${{ secrets.COUNT }}
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          DISCORD_WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TELEGRAM_WEBHOOK_URL: ${{ secrets.TELEGRAM_WEBHOOK_URL }}

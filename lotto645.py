@@ -1,6 +1,5 @@
 import datetime
 import json
-
 from datetime import timedelta
 from enum import Enum
 
@@ -9,10 +8,11 @@ from bs4 import BeautifulSoup as BS
 import auth
 from HttpClient import HttpClientSingleton
 
+
 class Lotto645Mode(Enum):
     AUTO = 1
     MANUAL = 2
-    BUY = 10 
+    BUY = 10
     CHECK = 20
 
 class Lotto645:
@@ -39,14 +39,14 @@ class Lotto645:
         self.http_client = HttpClientSingleton.get_instance()
 
     def buy_lotto645(
-        self, 
-        auth_ctrl: auth.AuthController, 
-        cnt: int, 
+        self,
+        auth_ctrl: auth.AuthController,
+        cnt: int,
         mode: Lotto645Mode
     ) -> dict:
-        assert type(auth_ctrl) == auth.AuthController
-        assert type(cnt) == int and 1 <= cnt <= 5
-        assert type(mode) == Lotto645Mode
+        assert isinstance(auth_ctrl, auth.AuthController)
+        assert isinstance(cnt, int) and 1 <= cnt <= 5
+        assert isinstance(mode, Lotto645Mode)
 
         headers = self._generate_req_headers(auth_ctrl)
         requirements = self._getRequirements(headers)
@@ -63,12 +63,12 @@ class Lotto645:
         return body
 
     def _generate_req_headers(self, auth_ctrl: auth.AuthController) -> dict:
-        assert type(auth_ctrl) == auth.AuthController
+        assert isinstance(auth_ctrl, auth.AuthController)
 
         return auth_ctrl.add_auth_cred_to_headers(self._REQ_HEADERS)
 
     def _generate_body_for_auto_mode(self, cnt: int, requirements: list) -> dict:
-        assert type(cnt) == int and 1 <= cnt <= 5
+        assert isinstance(cnt, int) and 1 <= cnt <= 5
 
         SLOTS = [
             "A",
@@ -76,7 +76,7 @@ class Lotto645:
             "C",
             "D",
             "E",
-        ]  
+        ]
 
         return {
             "round": self._get_round(),
@@ -94,11 +94,11 @@ class Lotto645:
         }
 
     def _generate_body_for_manual(self, cnt: int) -> dict:
-        assert type(cnt) == int and 1 <= cnt <= 5
+        assert isinstance(cnt, int) and 1 <= cnt <= 5
 
         raise NotImplementedError()
 
-    def _getRequirements(self, headers: dict) -> list: 
+    def _getRequirements(self, headers: dict) -> list:
         org_headers = headers.copy()
 
         headers["Referer"] ="https://ol.dhlottery.co.kr/olotto/game/game645.do"
@@ -108,15 +108,15 @@ class Lotto645:
 
 		#no param needed at now
         res = self.http_client.post(
-            url="https://ol.dhlottery.co.kr/olotto/game/egovUserReadySocket.json", 
+            url="https://ol.dhlottery.co.kr/olotto/game/egovUserReadySocket.json",
             headers=headers
         )
-        
+
         direct = json.loads(res.text)["ready_ip"]
-        
+
 
         res = self.http_client.post(
-            url="https://ol.dhlottery.co.kr/olotto/game/game645.do", 
+            url="https://ol.dhlottery.co.kr/olotto/game/game645.do",
             headers=org_headers
         )
         html = res.text
@@ -137,11 +137,11 @@ class Lotto645:
         last_drawn_round = int(soup.find("strong", id="lottoDrwNo").text)
         return str(last_drawn_round + 1)
 
-    def get_balance(self, auth_ctrl: auth.AuthController) -> str: 
+    def get_balance(self, auth_ctrl: auth.AuthController) -> str:
 
         headers = self._generate_req_headers(auth_ctrl)
         res = self.http_client.post(
-            url="https://dhlottery.co.kr/userSsl.do?method=myPage", 
+            url="https://dhlottery.co.kr/userSsl.do?method=myPage",
             headers=headers
         )
 
@@ -151,10 +151,10 @@ class Lotto645:
         )
         balance = soup.find("p", class_="total_new").find('strong').text
         return balance
-        
+
     def _try_buying(self, headers: dict, data: dict) -> dict:
-        assert type(headers) == dict
-        assert type(data) == dict
+        assert isinstance(headers, dict)
+        assert isinstance(data, dict)
 
         headers["Content-Type"]  = "application/x-www-form-urlencoded; charset=UTF-8"
 
@@ -167,18 +167,18 @@ class Lotto645:
         return json.loads(res.text)
 
     def check_winning(self, auth_ctrl: auth.AuthController) -> dict:
-        assert type(auth_ctrl) == auth.AuthController
+        assert isinstance(auth_ctrl, auth.AuthController)
 
         headers = self._generate_req_headers(auth_ctrl)
 
         parameters = self._make_search_date()
 
         data = {
-            "nowPage": 1, 
+            "nowPage": 1,
             "searchStartDate": parameters["searchStartDate"],
             "searchEndDate": parameters["searchEndDate"],
             "winGrade": 2,
-            "lottoId": "LO40", 
+            "lottoId": "LO40",
             "sortOrder": "DESC"
         }
 
@@ -240,11 +240,11 @@ class Lotto645:
                 "winning_date": winnings[7].text.strip(),
                 "lotto_details": lotto_results
             }
-        except:
+        except Exception:
             pass
 
         return result_data
-    
+
     def _make_search_date(self) -> dict:
         today = datetime.datetime.today()
         today_str = today.strftime("%Y%m%d")
@@ -256,11 +256,11 @@ class Lotto645:
         }
 
     def _show_result(self, body: dict) -> None:
-        assert type(body) == dict
+        assert isinstance(body, dict)
 
         if body.get("loginYn") != "Y":
             return
 
         result = body.get("result", {})
-        if result.get("resultMsg", "FAILURE").upper() != "SUCCESS":    
+        if result.get("resultMsg", "FAILURE").upper() != "SUCCESS":
             return
