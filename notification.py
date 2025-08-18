@@ -9,6 +9,7 @@ class Notification:
 
         result = body.get("result", {})
         if result.get("resultMsg", "FAILURE").upper() != "SUCCESS":
+            self._send_telegram_webhook(webhook_url, result.get("resultMsg"))
             return
 
         lotto_number_str = self.make_lotto_number_message(result["arrGameChoiceNum"])
@@ -32,6 +33,7 @@ class Notification:
     def send_win720_buying_message(self, body: dict, webhook_url: str) -> None:
 
         if body.get("resultCode") != '100':
+            self._send_telegram_webhook(webhook_url, body.get("resultMsg"))
             return
 
         win720_round = body.get("resultMsg").split("|")[3]
