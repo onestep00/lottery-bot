@@ -123,8 +123,8 @@ class Lotto645:
         soup = BS(
             html, "html5lib"
         )
-        draw_date = soup.find("input", id="ROUND_DRAW_DATE").get('value')
-        tlmt_date = soup.find("input", id="WAMT_PAY_TLMT_END_DT").get('value')
+        draw_date = (soup.find("input", id="ROUND_DRAW_DATE") or {}).get('value')
+        tlmt_date = (soup.find("input", id="WAMT_PAY_TLMT_END_DT") or {}).get('value')
 
         return [direct, draw_date, tlmt_date]
 
