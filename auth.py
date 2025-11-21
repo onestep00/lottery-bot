@@ -1,6 +1,7 @@
 import copy
 
 import requests
+from bs4 import BeautifulSoup as BS
 
 from HttpClient import HttpClientSingleton
 
@@ -25,6 +26,7 @@ class AuthController:
     }
 
     _AUTH_CRED = ""
+    _CHANGE_PASSWORD_URL = "https://dhlottery.co.kr/userSsl.do?method=pspnPwChng"
 
 
     def __init__(self):
@@ -42,9 +44,12 @@ class AuthController:
 
         data = self._generate_body(user_id, password)
 
-        _res = self._try_login(headers, data)  # 새로운 값의 JSESSIONID가 내려오는데, 이 값으론 로그인 안됨
+        res = self._try_login(headers, data)
 
-        self._update_auth_cred(default_auth_cred)
+        if self._is_change_password_page(res.text):
+            self._skip_change_password(res.text)
+
+        self._update_auth_cred(self._get_j_session_id_from_session(default_auth_cred))
 
     def add_auth_cred_to_headers(self, headers: dict) -> str:
         assert isinstance(headers, dict)
@@ -106,3 +111,43 @@ class AuthController:
         # 로그인 실패해도 jsession 값이 갱신되기 때문에, 마이페이지 방문 등으로 판단해야 할 듯
         # + 비번 5번 틀렸을 경우엔 비번 정확해도 로그인 실패함
         self._AUTH_CRED = j_session_id
+
+    def _is_change_password_page(self, html: str) -> bool:
+        assert isinstance(html, str)
+
+        soup = BS(html, "html5lib")
+        return bool(soup.find("div", {"class": "content_change_password"}))
+
+    def _skip_change_password(self, html: str) -> None:
+        assert isinstance(html, str)
+
+        soup = BS(html, "html5lib")
+        form = soup.find("form", {"name": "userIdCheckForm"})
+
+        if form is None:
+            return
+
+        form_inputs = self._extract_form_inputs(form)
+        self.http_client.post(
+            self._CHANGE_PASSWORD_URL,
+            headers=copy.deepcopy(self._REQ_HEADERS),
+            data=form_inputs
+        )
+
+    def _extract_form_inputs(self, form) -> dict:
+        inputs = {}
+        for input_tag in form.find_all("input"):
+            name = input_tag.get("name")
+            value = input_tag.get("value")
+            if name and value is not None:
+                inputs[name] = value
+        return inputs
+
+    def _get_j_session_id_from_session(self, default_auth_cred: str) -> str:
+        assert isinstance(default_auth_cred, str)
+
+        for cookie in self.http_client.session.cookies:
+            if cookie.name == "JSESSIONID":
+                return cookie.value
+
+        return default_auth_cred

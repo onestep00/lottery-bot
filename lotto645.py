@@ -198,6 +198,9 @@ class Lotto645:
 
             winnings = soup.find("table", class_="tbl_data tbl_data_col").find_all("tbody")[0].find_all("td")
 
+            if len(winnings) == 1:
+                return result_data
+
             get_detail_info = winnings[3].find("a").get("href")
 
             order_no, barcode, issue_no = get_detail_info.split("'")[1::2]
@@ -229,9 +232,6 @@ class Lotto645:
                     "status": status,
                     "result": formatted_nums
                 })
-
-            if len(winnings) == 1:
-                return result_data
 
             result_data = {
                 "round": winnings[2].text.strip(),

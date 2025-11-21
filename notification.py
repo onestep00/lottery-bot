@@ -87,6 +87,7 @@ class Notification:
 
             self._send_telegram_webhook(webhook_url, f"```ini\n{formatted_results}```\n{winning_message}")
         except KeyError:
+            self._send_telegram_webhook(webhook_url, "로또 - 다음 기회에... 🫠")
             return
 
     def send_win720_winning_message(self, winning: dict, webhook_url: str) -> None:
@@ -107,8 +108,7 @@ class Notification:
 
             self._send_telegram_webhook(webhook_url, message)
         except KeyError:
-            message = "연금복권 - 다음 기회에... 🫠"
-            self._send_telegram_webhook(webhook_url, message)
+            self._send_telegram_webhook(webhook_url, "연금복권 - 다음 기회에... 🫠")
             return
 
     def _send_discord_webhook(self, webhook_url: str, message: str) -> None:
