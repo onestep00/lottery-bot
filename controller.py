@@ -14,7 +14,7 @@ def buy_lotto645(authCtrl: auth.AuthController, cnt: int, mode: str):
     lotto = lotto645.Lotto645()
     _mode = lotto645.Lotto645Mode[mode.upper()]
     response = lotto.buy_lotto645(authCtrl, cnt, _mode)
-    response['balance'] = lotto.get_balance(auth_ctrl=authCtrl)
+    response['balance'] = authCtrl.get_user_balance()
     return response
 
 def check_winning_lotto645(authCtrl: auth.AuthController) -> dict:
@@ -25,7 +25,7 @@ def check_winning_lotto645(authCtrl: auth.AuthController) -> dict:
 def buy_win720(authCtrl: auth.AuthController, username: str):
     pension = win720.Win720()
     response = pension.buy_Win720(authCtrl, username)
-    response['balance'] = pension.get_balance(auth_ctrl=authCtrl)
+    response['balance'] = authCtrl.get_user_balance()
     return response
 
 def check_winning_win720(authCtrl: auth.AuthController) -> dict:
@@ -48,7 +48,7 @@ def send_message(mode: int, lottery_type: int, response: dict, webhook_url: str)
             notify.send_win720_buying_message(response, webhook_url)
 
 def check():
-    load_dotenv()
+    load_dotenv(override=True)
 
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
@@ -63,9 +63,9 @@ def check():
     response = check_winning_win720(globalAuthCtrl)
     send_message(0, 1, response=response, webhook_url=telegram_webhook_url)
 
-def buy():
-
-    load_dotenv()
+def buy(): 
+    
+    load_dotenv(override=True) 
 
     username = os.environ.get('USERNAME')
     password = os.environ.get('PASSWORD')
@@ -81,7 +81,10 @@ def buy():
 
     time.sleep(1)
 
-    response = buy_win720(globalAuthCtrl, username)
+    globalAuthCtrl.http_client.session.cookies.clear()
+    globalAuthCtrl.login(username, password)
+
+    response = buy_win720(globalAuthCtrl, username) 
     send_message(1, 1, response=response, webhook_url=telegram_webhook_url)
 
 def run():
