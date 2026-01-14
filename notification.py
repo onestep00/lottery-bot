@@ -9,7 +9,7 @@ class Notification:
 
         result = body.get("result", {})
         if result.get("resultMsg", "FAILURE").upper() != "SUCCESS":  
-            message = f"로또 구매 실패 (`{result.get('resultMsg', 'Unknown Error')}`) 남은잔액 : {body.get('balance', '확인불가')}"
+            message = f"로또 구매 실패 `({result.get('resultMsg', 'Unknown Error')})` 남은잔액 : `{body.get('balance', '확인불가')}`"
             self._send_telegram_webhook(webhook_url, message)
             return
 
@@ -34,7 +34,7 @@ class Notification:
     def send_win720_buying_message(self, body: dict, webhook_url: str) -> None:
         
         if body.get("resultCode") != '100':  
-            message = f"연금복권 구매 실패 (`{body.get('resultMsg', 'Unknown Error')}`) 남은잔액 : {body.get('balance', '확인불가')}"
+            message = f"연금복권 구매 실패 `({body.get('resultMsg', 'Unknown Error')})` 남은잔액 : `{body.get('balance', '확인불가')}`"
             self._send_telegram_webhook(webhook_url, message)
             return       
 
@@ -146,4 +146,4 @@ class Notification:
         requests.post(webhook_url, json=payload)
 
     def _send_telegram_webhook(self, webhook_url: str, message: str) -> None:
-        requests.get(webhook_url, params={"text": message, "parse_mode": "markdown"})
+        requests.get(webhook_url, params={"text": message, "parse_mode": "markdownv2"})

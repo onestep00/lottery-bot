@@ -21,7 +21,7 @@ class AuthController:
         "Origin": "https://dhlottery.co.kr",
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9",
-        "Referer": "https://dhlottery.co.kr/",
+        "Referer": "https://www.dhlottery.co.kr/",
         "Sec-Fetch-Site": "same-site",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-User": "?1",
@@ -30,7 +30,7 @@ class AuthController:
     }
 
     _AUTH_CRED = ""
-    _CHANGE_PASSWORD_URL = "https://dhlottery.co.kr/userSsl.do?method=pspnPwChng"
+    _CHANGE_PASSWORD_URL = "https://www.dhlottery.co.kr/userSsl.do?method=pspnPwChng"
 
     def __init__(self):
         self.http_client = HttpClientSingleton.get_instance()
@@ -39,8 +39,8 @@ class AuthController:
         assert isinstance(user_id, str)
         assert isinstance(password, str)
 
-        self.http_client.get("https://dhlottery.co.kr/", headers=self._REQ_HEADERS)
-        self.http_client.get("https://dhlottery.co.kr/user.do?method=login", headers=self._REQ_HEADERS)
+        self.http_client.get("https://www.dhlottery.co.kr/", headers=self._REQ_HEADERS)
+        self.http_client.get("https://www.dhlottery.co.kr/user.do?method=login", headers=self._REQ_HEADERS)
         self.http_client.get("https://www.dhlottery.co.kr/", headers=self._REQ_HEADERS)
         self.http_client.get("https://www.dhlottery.co.kr/user.do?method=login", headers=self._REQ_HEADERS)
 
@@ -138,7 +138,7 @@ class AuthController:
              self._update_auth_cred(new_jsessionid)
 
         try:
-             self.http_client.get("https://dhlottery.co.kr/main", headers=self._REQ_HEADERS)
+             self.http_client.get("https://www.dhlottery.co.kr/main", headers=self._REQ_HEADERS)
         except Exception as e:
              print(f"[Warning] Failed to check main page after login: {e}")
              
@@ -172,16 +172,16 @@ class AuthController:
     def get_user_balance(self) -> str:
         try:
              try:
-                 self.http_client.get("https://dhlottery.co.kr/mypage/home")
+                 self.http_client.get("https://www.dhlottery.co.kr/mypage/home")
              except requests.RequestException:
                  pass
 
              timestamp = int(datetime.datetime.now().timestamp() * 1000)
-             url = f"https://dhlottery.co.kr/mypage/selectUserMndp.do?_={timestamp}"
+             url = f"https://www.dhlottery.co.kr/mypage/selectUserMndp.do?_={timestamp}"
              
              headers = copy.deepcopy(self._REQ_HEADERS)
              headers.update({
-                "Referer": "https://dhlottery.co.kr/mypage/home",
+                "Referer": "https://www.dhlottery.co.kr/mypage/home",
                 "X-Requested-With": "XMLHttpRequest",
                 "Content-Type": "application/json;charset=UTF-8",
                 "Accept": "application/json, text/javascript, */*; q=0.01",
