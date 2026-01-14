@@ -8,7 +8,7 @@ class Notification:
         assert isinstance(webhook_url, str)
 
         result = body.get("result", {})
-        if result.get("resultMsg", "FAILURE").upper() != "SUCCESS":  
+        if result.get("resultMsg", "FAILURE").upper() != "SUCCESS":
             message = f"로또 구매 실패 `({result.get('resultMsg', 'Unknown Error')})` 남은잔액 : `{body.get('balance', '확인불가')}`"
             self._send_telegram_webhook(webhook_url, message)
             return
@@ -27,23 +27,22 @@ class Notification:
         lotto_number = [x.replace("|", " ") for x in lotto_number]
 
         # lotto_number to string
-        lotto_number = '\n'.join(x for x in lotto_number)
+        lotto_number = "\n".join(x for x in lotto_number)
 
         return lotto_number
 
     def send_win720_buying_message(self, body: dict, webhook_url: str) -> None:
-        
-        if body.get("resultCode") != '100':  
+        if body.get("resultCode") != "100":
             message = f"연금복권 구매 실패 `({body.get('resultMsg', 'Unknown Error')})` 남은잔액 : `{body.get('balance', '확인불가')}`"
             self._send_telegram_webhook(webhook_url, message)
-            return       
+            return
 
         win720_round = body.get("round", "?")
         if win720_round == "?":
             try:
-                 win720_round = body.get("saleTicket", "").split("|")[-2]
+                win720_round = body.get("saleTicket", "").split("|")[-2]
             except (IndexError, AttributeError, TypeError):
-                 win720_round = "?"
+                win720_round = "?"
 
         if not body.get("saleTicket"):
             win720_number_str = "번호 정보 없음"
@@ -69,33 +68,35 @@ class Notification:
             winning["money"]
 
             if winning["lotto_details"]:
-                max_label_status_length = max(len(f"{line['label']} {line['status']}") for line in winning["lotto_details"])
+                max_label_status_length = max(
+                    len(f"{line['label']} {line['status']}") for line in winning["lotto_details"]
+                )
 
                 formatted_lines = []
                 for line in winning["lotto_details"]:
                     line_label_status = f"{line['label']} {line['status']}".ljust(max_label_status_length)
                     line_result = line["result"]
-    
+
                     formatted_nums = []
                     for num in line_result:
-                        raw_num = re.search(r'\d+', num).group()
+                        raw_num = re.search(r"\d+", num).group()
                         formatted_num = f"{int(raw_num):02d}"
-                        if '✨' in num:
+                        if "✨" in num:
                             formatted_nums.append(f"[{formatted_num}]")
                         else:
                             formatted_nums.append(f" {formatted_num} ")
-    
+
                     formatted_nums = [f"{num:>6}" for num in formatted_nums]
-    
+
                     formatted_line = f"{line_label_status} " + " ".join(formatted_nums)
                     formatted_lines.append(formatted_line)
-    
+
                 formatted_results = "\n".join(formatted_lines)
             else:
                 formatted_results = "상세 정보를 불러오지 못했습니다."
 
-            is_winning = winning['money'] != "-" and winning['money'] != "0 원" and winning['money'] != "0"
-            
+            is_winning = winning["money"] != "-" and winning["money"] != "0 원" and winning["money"] != "0"
+
             if is_winning:
                 winning_message = f"로또 *{winning['round']}회* - *{winning['money']}* 당첨 되었습니다 🎉"
             else:
@@ -113,28 +114,30 @@ class Notification:
 
         try:
             if "win720_details" in winning and winning["win720_details"]:
-                max_label_status_length = max(len(f"{line['label']} {line['status']}") for line in winning["win720_details"])
+                max_label_status_length = max(
+                    len(f"{line['label']} {line['status']}") for line in winning["win720_details"]
+                )
                 formatted_lines = []
                 for line in winning["win720_details"]:
                     line_label_status = f"{line['label']} {line['status']}".ljust(max_label_status_length)
                     formatted_lines.append(f"{line_label_status} {line['result']}")
-                
+
                 formatted_results = "\n".join(formatted_lines)
                 message_content = f"```ini\n{formatted_results}```\n"
             else:
                 message_content = ""
 
-            is_winning = winning['money'] != "-" and winning['money'] != "0 원" and winning['money'] != "0"
+            is_winning = winning["money"] != "-" and winning["money"] != "0 원" and winning["money"] != "0"
 
             if is_winning:
                 message = f"{message_content}연금복권 *{winning['round']}회* - *{winning['money']}* 당첨 되었습니다 🎉"
             else:
-                 message = f"{message_content}연금복권 *{winning['round']}회* - 다음 기회에... 🫠"
+                message = f"{message_content}연금복권 *{winning['round']}회* - 다음 기회에... 🫠"
 
-            money_str = ", ".join([f"{money:,}원" for money in winning["money"]])
-            total = f"{sum(winning['money']):,}원"
+            # money_str = ", ".join([f"{money:,}원" for money in winning["money"]])
+            # total = f"{sum(winning['money']):,}원"
 
-            message = f"연금복권 *{round}회* - {money_str},\n총 *{total}* 당첨 되었습니다 🎉"
+            # message = f"연금복권 *{round}회* - {money_str},\n총 *{total}* 당첨 되었습니다 🎉"
 
             self._send_telegram_webhook(webhook_url, message)
         except KeyError:
@@ -142,8 +145,8 @@ class Notification:
             self._send_telegram_webhook(webhook_url, message)
 
     def _send_discord_webhook(self, webhook_url: str, message: str) -> None:
-        payload = { "content": message }
+        payload = {"content": message}
         requests.post(webhook_url, json=payload)
 
     def _send_telegram_webhook(self, webhook_url: str, message: str) -> None:
-        requests.get(webhook_url, params={"text": message, "parse_mode": "markdownv2"})
+        requests.get(webhook_url, params={"text": message, "parse_mode": "markdown"})

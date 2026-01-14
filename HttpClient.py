@@ -1,5 +1,6 @@
 import requests
 
+
 class HttpClient:
     def __init__(self):
         self.session = requests.Session()
@@ -22,6 +23,7 @@ class HttpClient:
         res = self.session.get(url, headers=session_headers, params=params, timeout=30)
         res.raise_for_status()
         return res
+
 
 class HttpClientSingleton:
     _instance = None
