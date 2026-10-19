@@ -117,6 +117,26 @@ pub fn purchase_pension(round: &str, number: &str, balance: &str) -> String {
         ),
     )
 }
+pub fn section_cards(title: &str, sections: &[String]) -> Vec<String> {
+    let mut messages = Vec::new();
+    let mut current = String::new();
+    for section in sections {
+        if !current.is_empty()
+            && current.encode_utf16().count() + section.encode_utf16().count() > 3500
+        {
+            messages.push(card(title, &current));
+            current.clear();
+        }
+        if !current.is_empty() {
+            current.push_str("\n\n────────────\n\n");
+        }
+        current.push_str(section);
+    }
+    if !current.is_empty() {
+        messages.push(card(title, &current));
+    }
+    messages
+}
 pub fn error(command: &str, reason: &str) -> String {
     let reason: String = reason.chars().take(800).collect();
     card("⚠️ 복권 봇 · 작업 중단", &format!("작업 <b>{}</b>\n\n{}\n\n구매 요청을 자동으로 반복하지 않습니다.\n결과가 불확실하면 사이트 구매내역을 확인하세요.", escape(command), escape(&reason)))

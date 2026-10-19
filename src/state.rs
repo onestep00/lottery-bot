@@ -21,7 +21,7 @@ pub struct Data {
     pub throttle_strikes: u32,
     // pending is deliberately permanent until a human reconciles an uncertain purchase.
     pub purchases: BTreeMap<String, String>,
-    pub completed_checks: BTreeMap<String, bool>,
+    pub check_sequence: u64,
     pub notifications: BTreeMap<String, crate::notification::Notice>,
     pub last_telegram_ms: i64,
     pub telegram_cooldown_until_ms: i64,
@@ -80,6 +80,23 @@ impl Store {
         }
         Ok(())
     }
+    pub fn begin_check(&mut self) -> Result<String> {
+        self.data.check_sequence = self
+            .data
+            .check_sequence
+            .checked_add(1)
+            .context("확인 실행 번호 초과")?;
+        // A fresh explicit check supersedes stale, unsent results. Purchases are untouched.
+        self.data
+            .notifications
+            .retain(|id, notice| !(id.starts_with("result:") && notice.status == "pending"));
+        self.save()?;
+        Ok(format!(
+            "{}-{}",
+            crate::lottery::today(),
+            self.data.check_sequence
+        ))
+    }
     pub fn reserve(&mut self, key: &str) -> Result<()> {
         if let Some(status) = self.data.purchases.get(key) {
             bail!("{key}: 기존 구매 상태({status})가 있어 재전송하지 않습니다. 사이트 구매내역을 확인하세요");
@@ -113,5 +130,19 @@ mod tests {
         drop(s);
         fs::write(dir.path().join("state.json"), b"broken").unwrap();
         assert!(Store::open(dir.path()).is_err());
+    }
+    #[test]
+    fn repeated_checks_have_independent_delivery_ids_without_touching_purchases() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut s = Store::open(dir.path()).unwrap();
+        s.reserve("lotto645:round:1247").unwrap();
+        let first = s.begin_check().unwrap();
+        crate::notification::enqueue(&mut s, "result:old", "stale".into()).unwrap();
+        crate::notification::enqueue(&mut s, "purchase:lotto", "receipt".into()).unwrap();
+        let second = s.begin_check().unwrap();
+        assert_ne!(first, second);
+        assert!(!s.data.notifications.contains_key("result:old"));
+        assert!(s.data.notifications.contains_key("purchase:lotto"));
+        assert_eq!(s.data.purchases["lotto645:round:1247"], "pending");
     }
 }

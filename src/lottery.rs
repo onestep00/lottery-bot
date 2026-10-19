@@ -221,25 +221,46 @@ impl<'a> Lottery<'a> {
         required(node, "totalAmt")
     }
     pub fn ledger(&self, s: &mut Store, product: &str) -> Result<Vec<Value>> {
-        let mut url = url::Url::parse(&format!("{BASE}/mypage/selectMyLotteryledger.do"))?;
-        url.query_pairs_mut().extend_pairs([
-            (
-                "srchStrDt",
-                (today() - Duration::days(14)).format("%Y%m%d").to_string(),
-            ),
-            ("srchEndDt", today().format("%Y%m%d").to_string()),
-            ("ltGdsCd", product.into()),
-            ("pageNum", "1".into()),
-            ("recordCountPerPage", "100".into()),
-            ("sort", "".into()),
-            ("winResult", "".into()),
-            ("lramSmam", "".into()),
-        ]);
-        let v = self
-            .http
-            .get(s, url.as_str(), &format!("{BASE}/mypage/mylotteryledger"))?
-            .json()?;
-        parse_ledger(&v)
+        self.ledger_days(s, product, 14)
+    }
+    fn ledger_days(&self, s: &mut Store, product: &str, days: i64) -> Result<Vec<Value>> {
+        let mut rows = Vec::new();
+        for page in 1..=5 {
+            let mut url = url::Url::parse(&format!("{BASE}/mypage/selectMyLotteryledger.do"))?;
+            url.query_pairs_mut().extend_pairs([
+                (
+                    "srchStrDt",
+                    (today() - Duration::days(days))
+                        .format("%Y%m%d")
+                        .to_string(),
+                ),
+                ("srchEndDt", today().format("%Y%m%d").to_string()),
+                ("ltGdsCd", product.into()),
+                ("pageNum", page.to_string()),
+                ("recordCountPerPage", "100".into()),
+                ("sort", "".into()),
+                ("winResult", "".into()),
+                ("lramSmam", "".into()),
+            ]);
+            let v = self
+                .http
+                .get(s, url.as_str(), &format!("{BASE}/mypage/mylotteryledger"))?
+                .json()?;
+            let (chunk, total) = parse_ledger_page(&v)?;
+            ensure!(
+                !chunk.is_empty() || rows.len() == total,
+                "구매내역 페이지가 비어 있어 전체 내역을 확인하지 못했습니다"
+            );
+            rows.extend(chunk);
+            ensure!(
+                rows.len() <= total,
+                "구매내역 페이지 건수가 일치하지 않습니다"
+            );
+            if rows.len() == total {
+                return Ok(rows);
+            }
+        }
+        bail!("구매내역이 500건을 초과하여 중단했습니다 (과도한 페이지 조회 방지)")
     }
     pub fn buy_lotto(&self, s: &mut Store) -> Result<String> {
         let weekly = format!("lotto645:week:{}", week());
@@ -474,17 +495,18 @@ impl<'a> Lottery<'a> {
         Ok(receipt)
     }
     pub fn check(&self, s: &mut Store, code: &str, name: &str) -> Result<Vec<(String, String)>> {
-        let rows = self.ledger(s, code)?;
+        let target = weekly_target(code, today())?;
+        let rows = weekly_orders(self.ledger_days(s, code, 91)?, code, target.0, target.1)?;
         if rows.is_empty() {
             return Ok(vec![(
                 "empty".into(),
                 notify::card(
                     &format!("📋 {name} · 당첨 확인"),
-                    "최근 14일 구매내역이 없습니다.",
+                    &format!("이번 주 추첨 대상 <b>{}회</b> ({}) 구매내역이 없습니다.\n웹에서 직접 구매한 내역도 함께 확인했습니다.", target.0, target.1),
                 ),
             )]);
         }
-        let mut messages = Vec::new();
+        let mut sections = Vec::new();
         for row in rows {
             let round = required(&row, "ltEpsd")?;
             let result = text(&row["ltWnResult"]);
@@ -521,7 +543,7 @@ impl<'a> Lottery<'a> {
                     ("barcd", required(&row, "gmInfo")?),
                     (
                         "srchStrDt",
-                        (today() - Duration::days(14)).format("%Y%m%d").to_string(),
+                        (today() - Duration::days(91)).format("%Y%m%d").to_string(),
                     ),
                     ("srchEndDt", today().format("%Y%m%d").to_string()),
                 ]);
@@ -589,15 +611,18 @@ impl<'a> Lottery<'a> {
                     ""
                 }
             );
-            messages.push((
-                required(&row, "ntslOrdrNo")?,
-                notify::card(&format!("📋 {name} · 당첨 확인"), &body),
-            ));
+            sections.push(body);
         }
-        Ok(messages)
+        Ok(
+            notify::section_cards(&format!("📋 {name} · 이번 주 당첨 확인"), &sections)
+                .into_iter()
+                .enumerate()
+                .map(|(index, message)| (index.to_string(), message))
+                .collect(),
+        )
     }
 }
-pub fn parse_ledger(v: &Value) -> Result<Vec<Value>> {
+fn parse_ledger_page(v: &Value) -> Result<(Vec<Value>, usize)> {
     let data = v
         .get("data")
         .filter(|d| d.is_object())
@@ -606,13 +631,97 @@ pub fn parse_ledger(v: &Value) -> Result<Vec<Value>> {
     let total: usize = required(data, "total")?
         .parse()
         .context("구매내역 total 형식 변경")?;
+    Ok((list.clone(), total))
+}
+#[cfg(test)]
+pub fn parse_ledger(v: &Value) -> Result<Vec<Value>> {
+    let (list, total) = parse_ledger_page(v)?;
     ensure!(
         total == list.len(),
-        "구매내역 {total}건 중 {}건만 수신: 불완전한 내역으로 판단하지 않음",
-        list.len()
+        "구매내역 전체 건수가 일치하지 않습니다"
     );
-    Ok(list.clone())
+    Ok(list)
 }
+// Weekly selection only. Purchase rounds are always obtained from the live game page/API.
+// These anchor pairs were verified against the live site on 2026-10-19.
+pub fn weekly_target(code: &str, date: chrono::NaiveDate) -> Result<(u32, chrono::NaiveDate)> {
+    let monday = date - Duration::days(date.weekday().num_days_from_monday() as i64);
+    let (weekday, anchor, round) = match code {
+        "LO40" => (
+            5,
+            chrono::NaiveDate::from_ymd_opt(2026, 10, 24).unwrap(),
+            1247,
+        ),
+        "LP72" => (
+            3,
+            chrono::NaiveDate::from_ymd_opt(2026, 10, 22).unwrap(),
+            338,
+        ),
+        _ => bail!("알 수 없는 복권 종류"),
+    };
+    let draw = monday + Duration::days(weekday);
+    let target = round + (draw - anchor).num_days().div_euclid(7);
+    ensure!(target > 0, "지원하지 않는 과거 추첨일");
+    Ok((target as u32, draw))
+}
+fn weekly_orders(
+    rows: Vec<Value>,
+    code: &str,
+    round: u32,
+    draw: chrono::NaiveDate,
+) -> Result<Vec<Value>> {
+    let mut orders: std::collections::BTreeMap<String, Value> = std::collections::BTreeMap::new();
+    for mut row in rows {
+        let row_round: u32 = required(&row, "ltEpsd")?
+            .parse()
+            .context("구매내역 회차 형식 오류")?;
+        if row_round != round {
+            continue;
+        }
+        let draw_value = text(&row["epsdRflDt"]);
+        if !draw_value.is_empty() {
+            let digits: String = draw_value
+                .chars()
+                .filter(char::is_ascii_digit)
+                .take(8)
+                .collect();
+            let actual = chrono::NaiveDate::parse_from_str(&digits, "%Y%m%d")
+                .context("구매내역 추첨일 형식 오류")?;
+            ensure!(
+                actual == draw,
+                "서버 추첨일이 주간 회차 기준과 다릅니다. 일정 변경 확인 필요"
+            );
+        }
+        let order = required(&row, "ntslOrdrNo")?;
+        if let Some(existing) = orders.get_mut(&order) {
+            // Pension ledger lists each group separately; the detail API returns all groups.
+            if code == "LP72" {
+                let amount = |v: &Value| -> Result<Option<u64>> {
+                    let value = text(&v["ltWnAmt"]).replace(',', "");
+                    if value.is_empty() {
+                        Ok(None)
+                    } else {
+                        Ok(Some(value.parse()?))
+                    }
+                };
+                if let (Some(first), Some(next)) = (amount(existing)?, amount(&row)?) {
+                    existing["ltWnAmt"] =
+                        json!(first.checked_add(next).context("당첨금 합계 초과")?);
+                }
+                let result = text(&row["ltWnResult"]);
+                if !result.is_empty() && result != "낙첨" {
+                    existing["ltWnResult"] = row["ltWnResult"].clone();
+                }
+            }
+        } else {
+            // No filter on local receipts: purchases made directly on the web are included.
+            row["ltEpsd"] = json!(round);
+            orders.insert(order, row);
+        }
+    }
+    Ok(orders.into_values().collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -647,5 +756,60 @@ mod tests {
             rsa_page_field("var rsaModulus = 'abcdef';", "rsaModulus").unwrap(),
             "abcdef"
         );
+    }
+    #[test]
+    fn same_week_draws_stay_selected_after_the_sales_round_changes() {
+        let monday = chrono::NaiveDate::from_ymd_opt(2026, 10, 19).unwrap();
+        for offset in 0..7 {
+            let day = monday + Duration::days(offset);
+            assert_eq!(
+                weekly_target("LO40", day).unwrap(),
+                (1247, chrono::NaiveDate::from_ymd_opt(2026, 10, 24).unwrap())
+            );
+            assert_eq!(
+                weekly_target("LP72", day).unwrap(),
+                (338, chrono::NaiveDate::from_ymd_opt(2026, 10, 22).unwrap())
+            );
+        }
+        assert_eq!(
+            weekly_target("LO40", monday + Duration::days(7)).unwrap().0,
+            1248
+        );
+        let year_end = chrono::NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
+        assert_eq!(
+            weekly_target("LO40", year_end).unwrap().1,
+            chrono::NaiveDate::from_ymd_opt(2027, 1, 2).unwrap()
+        );
+    }
+    #[test]
+    fn current_week_includes_web_purchases_and_deduplicates_pension_orders() {
+        let draw = chrono::NaiveDate::from_ymd_opt(2026, 10, 22).unwrap();
+        let rows = vec![
+            json!({"ltEpsd":337,"ntslOrdrNo":"previous","epsdRflDt":"2026-10-15"}),
+            json!({"ltEpsd":338,"ntslOrdrNo":"web-order","eltOrdrDt":"2026-09-30","epsdRflDt":null,"ltWnAmt":null}),
+            json!({"ltEpsd":338,"ntslOrdrNo":"web-order","epsdRflDt":null,"ltWnAmt":null}),
+            json!({"ltEpsd":339,"ntslOrdrNo":"future","epsdRflDt":null}),
+        ];
+        let result = weekly_orders(rows, "LP72", 338, draw).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0]["ntslOrdrNo"], "web-order");
+        assert!(weekly_orders(
+            vec![json!({"ltEpsd":338,"ntslOrdrNo":"shifted","epsdRflDt":"2026-10-23"})],
+            "LP72",
+            338,
+            draw
+        )
+        .is_err());
+    }
+    #[test]
+    fn pension_win_summary_includes_winning_groups_after_losing_first_group() {
+        let draw = chrono::NaiveDate::from_ymd_opt(2026, 10, 22).unwrap();
+        let rows = vec![
+            json!({"ltEpsd":338,"ntslOrdrNo":"order","epsdRflDt":"2026-10-22","ltWnAmt":"0","ltWnResult":"낙첨"}),
+            json!({"ltEpsd":338,"ntslOrdrNo":"order","epsdRflDt":"2026-10-22","ltWnAmt":"1000","ltWnResult":"당첨"}),
+        ];
+        let result = weekly_orders(rows, "LP72", 338, draw).unwrap();
+        assert_eq!(result[0]["ltWnAmt"], 1000);
+        assert_eq!(result[0]["ltWnResult"], "당첨");
     }
 }

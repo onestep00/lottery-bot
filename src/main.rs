@@ -21,7 +21,7 @@ fn run() -> Result<()> {
     let mut args = std::env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "help".into());
     if command == "help" || command == "--help" {
-        println!("lottery-bot <doctor|status|preflight|notify-test|notify|buy|check> [--env /absolute/path/.env]\n  doctor: 로컬 설정 확인 (외부 요청 없음)\n  status: 로그인/잔액 확인 (구매 없음)\n  preflight: 로그인/게임/구매내역 사전 점검 (구매 없음)\n  notify-test: 설치 확인 텔레그램 알림 1회\n  notify: 보관 중인 미전송 알림 전송\n  buy: 로또 COUNT게임 + 연금복권 5매 구매\n  check: 최근 14일 구매/당첨 확인 및 알림\n기본 .env는 현재 작업 디렉터리 기준, 프로세스 환경변수 우선");
+        println!("lottery-bot <doctor|status|preflight|notify-test|notify|buy|check> [--env /absolute/path/.env]\n  doctor: 로컬 설정 확인 (외부 요청 없음)\n  status: 로그인/잔액 확인 (구매 없음)\n  preflight: 로그인/게임/구매내역 사전 점검 (구매 없음)\n  notify-test: 설치 확인 텔레그램 알림 1회\n  notify: 보관 중인 미전송 알림 전송\n  buy: 로또 COUNT게임 + 연금복권 5매 구매\n  check: 이번 주 추첨 대상 확인 및 알림 (매 실행마다 조회)\n기본 .env는 현재 작업 디렉터리 기준, 프로세스 환경변수 우선");
         return Ok(());
     }
     let env_file = match args.next() {
@@ -65,13 +65,21 @@ fn run() -> Result<()> {
     if command == "notify" {
         return flush(&config, &mut s);
     }
-    let result = execute(&config, &mut s, &command);
+    let check_run = if command == "check" {
+        Some(s.begin_check()?)
+    } else {
+        None
+    };
+    let result = execute(&config, &mut s, &command, check_run.as_deref());
     // Scheduled authentication, HTTP, parsing, and purchase failures all get a real alert.
     if let Err(ref reason) = result {
         if command == "buy" || command == "check" {
             enqueue(
                 &mut s,
-                &format!("error:{command}:{}", week()),
+                &format!(
+                    "error:{command}:{}",
+                    check_run.as_deref().unwrap_or(&week())
+                ),
                 error(&command, &format!("{reason:#}")),
             )?;
         }
@@ -87,12 +95,7 @@ fn run() -> Result<()> {
     result?;
     delivery
 }
-fn execute(config: &Config, s: &mut Store, command: &str) -> Result<()> {
-    let check_key = format!("check:{}", week());
-    if command == "check" && s.data.completed_checks.contains_key(&check_key) {
-        println!("이번 주 확인 완료: 중복 접속 생략");
-        return Ok(());
-    }
+fn execute(config: &Config, s: &mut Store, command: &str, check_run: Option<&str>) -> Result<()> {
     if command == "buy"
         && ["lotto645", "win720"].iter().all(|p| {
             s.data
@@ -130,11 +133,16 @@ fn execute(config: &Config, s: &mut Store, command: &str) -> Result<()> {
             for (code, name) in [("LO40", "로또 6/45"), ("LP72", "연금복권 720+")] {
                 for (order, message) in api.check(s, code, name)? {
                     println!("{message}");
-                    enqueue(s, &format!("result:{code}:{}:{order}", week()), message)?;
+                    enqueue(
+                        s,
+                        &format!(
+                            "result:{code}:{}:{order}",
+                            check_run.context("확인 실행 ID 없음")?
+                        ),
+                        message,
+                    )?;
                 }
             }
-            s.data.completed_checks.insert(check_key, true);
-            s.save()?;
         }
         _ => unreachable!(),
     }
