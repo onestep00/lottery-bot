@@ -1,0 +1,29 @@
+[package]
+name = "lottery-bot"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
+fs2 = "0.4"
+hex = "0.4"
+httpdate = "1"
+pbkdf2 = "0.12"
+rand = "0.8"
+regex = "1"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "cookies", "json", "charset", "rustls-tls"] }
+rsa = "0.9"
+scraper = "0.24"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+url = "2"
+
+[dev-dependencies]
+tempfile = "3"

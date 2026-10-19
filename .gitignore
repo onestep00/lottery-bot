@@ -165,3 +165,7 @@ cython_debug/
 
 .DS_Store
 # End of https://www.toptal.com/developers/gitignore/api/python
+# Rust binary and local scheduler data
+/bin/
+/.state/
+/.logs/
